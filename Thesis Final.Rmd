@@ -1,0 +1,935 @@
+---
+title: |
+  <center> *Modeling Market Factors Using Volatility* </center>
+  <center> \large Constructing Mimicking Portfolios in Response to Market Shocks:</center>
+author: "Mateo Panjol-Tuflija"
+date: "5/12/2021"
+number_sections: true
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{float}
+    - \usepackage{graphicx}
+abstract: \singlespacing This paper studies the effects of market shocks on the behavior of autocorrelation of normalized volatility changes and Fama-French Factors. Furthermore, the paper offers methods to use autocorrelation of normalized volatility changes as an independent predictor of factor performance. Finally, coupled with methods of modeling volatility described within, the paper offers a method to construct efficient portfolios of Fama-French factors as a way to hedge against increased volatility levels.
+geometry: margin=1in
+fontsize: 12pt
+fig_caption: yes
+fig_height: 2
+fig_width: 3
+indent: true
+output:
+  
+  pdf_document: 
+    number_sections: true
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+options(knitr.kable.NA = '')
+library(knitr)
+library(readxl)
+library(readr)
+library(tidyverse)
+library("gridExtra")
+library(ggplot2)
+library(dplyr)
+library(stargazer)
+library(PerformanceAnalytics)
+spy_equity_normal <- read_csv("spy_equity_normal.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y"), 
+        Equity = col_number()))
+spy_equity_shock <- read_csv("spy_equity_shock.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y"), 
+        Equity = col_number()))
+vol_dist <- read_csv("vol_dist.csv", col_types = cols(Date = col_date(format = "%m/%d/%Y"), 
+    `Z-Score` = col_double()))
+z_scores <- read_csv("z_scores.csv", col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+rho_dist <- read_csv("rho_dist.csv", col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+rho_dist_normal <- read_csv("rho_dist_normal.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+rho_dist_shock <- read_csv("rho_dist_shock.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+norm_test <- read_csv("norm_test.csv")
+mean_test <- read_csv("mean_test.csv")
+factors_normal <- read_csv("factors_normal.csv")
+factors_shock <- read_csv("factors_shock.csv")
+factor_test_res <- read_csv("factor_test_res.csv")
+rng_rsq <- read_csv("rng-rsq.csv", col_types = cols(Range = col_number(), 
+    Rsq = col_number()))
+mkt_0_2262_0_199799999999999 <- read_csv("mkt_0.2262_0.199799999999999.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+mkt_0_31325_0_3045 <- read_csv("mkt_0.31325_0.3045.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+mkt_0_4285_0_4115 <- read_csv("mkt_0.4285_0.4115.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+smb_0_2166_0_20939_3 <- read_csv("smb_0.2166_0.20939_3.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+smb_0_315_0_30375_4 <- read_csv("smb_0.315_0.30375_4.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+smb_0_4315_0_4205_2 <- read_csv("smb_0.4315_0.4205_2.csv", 
+    col_types = cols(X1 = col_skip(), Date = col_date(format = "%m/%d/%Y")))
+hml_0_2136_0_2058_3 <- read_csv("hml_0.2136_0.2058_3.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+hml_0_3288_0_30275_4 <- read_csv("hml_0.3288_0.30275_4.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+past_04_t <- read_csv("past_04_t.csv")
+smb_0_2055_0_2265_4 <- read_csv("smb_0.2055_0.2265_4.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+smb_0_2668_0_2915_3 <- read_csv("smb_0.2668_0.2915_3.csv")
+smb_0_2941_0_3120_2 <- read_csv("smb_0.2941_0.3120_2.csv")
+smb_0_35912_0_3950_2 <- read_csv("smb_0.35912_0.3950_2.csv")
+hml_0_2668_0_2893_3 <- read_csv("hml_0.2668_0.2893_3.csv")
+hml_0_1865_0_2255_4 <- read_csv("hml_0.1865_0.2255_4.csv")
+hml_0_3518_0_3753_3 <- read_csv("hml_0.3518_0.3753_3.csv")
+hml_0_2957_0_3130_2 <- read_csv("hml_0.2957_0.3130_2.csv")
+mkt_0_1955_0_2235_4 <- read_csv("mkt_0.1955_0.2235_4.csv")
+mkt_0_2608_0_2893_4 <- read_csv("mkt_0.2608_0.2893_4.csv")
+mkt_0_3546_0_3904_1 <- read_csv("mkt_0.3546_0.3904_1.csv")
+mkt_0_2894_0_3083_3 <- read_csv("mkt_0.2894_0.3083_3.csv")
+vol_all <- read_csv("vol_all.csv", col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+returns_all <- read_csv("returns_all.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+garch_2_2_output_1 <- read_excel("garch_2_2_output_1.xlsx")
+garch_1_1_output_1 <- read_excel("garch_1_1_output_1.xlsx")
+garch_1_1_output <- read_excel("garch_1_1_output.xlsx", 
+    col_types = c("date", "numeric", "numeric"))
+garch_2_2_output <- read_excel("garch_2_2_output.xlsx", 
+    col_types = c("date", "numeric", "numeric"))
+```
+
+\newpage
+\doublespacing
+# Introduction
+
+
+Volatility plays an integral role within financial markets and is, as such, a subject of interest for institutional and retail investors alike. In fact, in April of 2019, institutional investors were net short about 178,000 VIX futures contracts on April 23, the largest such position on record since 2004^1^. It is clear that even at times of relative stability within financial markets, a significant amount of capital and other resources is dedicated to the study of volatility. Yet, the importance of researching volatility is best demonstrated at times when the relative stability of the financial markets is disturbed, a concept with which investors in the current market are more than acquainted with.  
+
+
+Spurred by the COVID-19 market crisis, 304^2^ hedge funds liquidated solely in the first quarter of 2020, marking a new record that spans five years. Yet, these closures are no surprise given record high volatility experienced by the financial markets, with the fastest drop in global equity markets in financial history. Consequently, daily volatility averaged 2.17% in 2020, a significant increase to levels exhibited in 2019 which stood at only 0.78%. Such a drastic increase in volatility is catastrophic for investors on its own. Coupled with the fact that institutional investors were mainly betting on calm waters (as demonstrated by the record net short position in 2019), the sudden increase in volatility produced the conditions for a "perfect storm".  
+
+
+The catastrophic results exhibited by a significant population of funds in early 2020 raises the question whether there exists a systematic way to not only react to increased market volatility in a modular and diversifiable manner, but to track and forecast the development of volatility in real time. As such, this paper seeks to explore ways to model market volatility and determine systematic links between increases in volatility and the performance of core market factors. The necessity of establishing a relationship between increased volatility and market performance is clear if one seeks to respond to said changes in volatility.
+
+\newpage
+\doublespacing
+
+
+
+Yet, the universe of possible financial instruments with which an investor can hedge against volatility is sizable and exploring relationships for all would be infeasible. Consequently, this paper explores the relationship between increased volatility and the three core factors as described by the Fama–French three-factor model. Given their construction and nature, relationships established between volatility and the Fama-French factors can be extrapolated to a large variety of financial instruments through the use of mimicking portfolios, as is described later within this paper.  
+
+# Data
+
+
+As described in the introduction, there are two areas of interests for which data is required: equity returns volatility and Fama-French factors.
+
+
+## Returns Data
+
+
+As a proxy for the general US equities market, I use the S&P 500 index, given its wide coverage of the total market capitalization in the US. The return data spans from January 1^st^, 2000 to May 5^th^, 2020 and was obtained directly from Yahoo Finance. The initial data set, therefore, consists of 5,370 observations of daily returns. Under the assumption that the S&P 500 index serves as a proxy for the market the volatility of daily returns within this data set will consequently serve as a proxy for general market volatility. 
+
+
+## Fama-French Factor Data
+
+
+Data for market factor returns is obtained through the Kenneth R. French - Data Library, in daily form, ranging from January 2000 to May 2021. The acquired data set spans the same period and also consists of 5,370 observations. Three factors are under my consideration: the excess return of the market, the SMB factor, and the HML factor.
+\newpage
+\doublespacing
+
+
+
+SMB (Small Minus Big) is the average return on the three small portfolios minus the average return on the three big portfolios, while HML (High Minus Low) is the average return on the two value portfolios minus the average return on the two growth portfolios^3^. The excess return on the market is defined as the value-weight return of all CRSP firms incorporated in the US and listed on the NYSE, AMEX, or NASDAQ that have a CRSP share code of 10 or 11 at the beginning of month t, good shares and price data at the beginning of t, and good return data for t minus the one-month Treasury bill rate (from Ibbotson Associates)^3^.
+
+
+# Methodology
+
+
+This paper's methodology can be divided into the following steps: Establishing the Effects of Market Shocks, Exploration of Volatility-Factor Relationships, Volatility Forecasting, and Portfolio Construction. Such an ordering
+offers a logically sound path through the goals of this paper, from establishing historical relationships through forecasting methods to constructing portfolios which can be employed in reality.
+
+
+## Establishing the Effects of Market Shocks
+
+
+As described beforehand, my data spans both periods of relative calm within markets and market shocks. I could employ a brute force method of exploring the effects of heightened volatility throughout this data set, yet it seems wasteful and difficult to follow. Consequently, I divide returns data into two two subsets: the control group (periods when market shocks are absent) and market shocks. Such a division serves only as a baseline for further exploration into the relationship between heightened volatility and Fama-French factors.  
+
+
+
+To begin with, I define market shocks as periods where the market loses more than 10% of its value within a month and is solely bound to the downturn and does not include rebounds. The threshold of 10% was chosen as it represents a significant decrease in market capitalization while also providing a total of 967 observations. On the other hand, increased thresholds significantly reduce the number of observations, with a threshold of 20% already reducing the total number of observations to 181, which would be less than necessary to properly examine any relationship between volatility and factor performance. Although crude, defining market shocks in this manner allows for a first glimpse into the effects of market shocks on both volatility and Fama-French factors, which is useful for further, deeper analysis.  
+
+
+
+I used a simple Python algorithm (Appendix I) to find periods where such a definition holds. Figure I displays the S&P500’s equity with periods of market shocks painted in red. Equity is defined as cumulative returns with the baseline set at 100% equity on January 1^st^ 2000. 
+
+
+
+```{r echo = FALSE, fig.align="center", fig.cap = "SPY Equity 2000-2020", fig.show="hold", out.width="75%"}
+combo = rbind(spy_equity_normal,spy_equity_shock)
+sorted_combo <- combo[order(combo$Date),]
+sorted_combo$Group <- as.factor(sorted_combo$Group)
+ggplot(sorted_combo, aes(x=Date, y=Equity, color = Group)) + geom_point(size = 0.75)+ scale_color_manual(values=c("#000000", "#bf290b"))+ylab("Equity(%)")+ theme_bw()+ theme(legend.position = "none")
+```
+
+
+Following the aforementioned definition of market shocks, one can notice that the SPY index has seen 18 major sell-offs. In total, we observe 642 daily returns during market shocks and 4,310 daily returns during normal market conditions. With clearly defined periods of market shocks, we can move to the next step and examine the effects of market shocks on volatility and Fama-French factors.  
+
+
+### Market Shock Effect on Volatility
+
+
+
+First, I examine the effects of market shocks on volatility in the hopes of establishing volatility as an indicator variable for future shocks. I define volatility of daily returns as the standard deviation of daily returns for a given period. Specifically, I observe the trailing one month volatility and, as such, calculate volatility as the standard deviation of returns for a period of 20 observations of returns (average trading month). This period is trailing, in other words, for any point in time within the data set the period is defined as containing returns from 20 days prior up to the point in question.  
+
+
+
+However, on its own, absolute volatility is not useful for measuring the extent of market shocks as it offers no context in regard to the volatility for the rest of the year. A far better relative measure is normalized volatility which represents current volatility as a Z-score based on the trailing one year distribution. Specifically, volatility is normalized based on *Equation (1)*.  
+
+
+\begin {center}
+
+$\Huge \hat{\sigma_t} = \frac{\sigma_t-\overline{\sigma}_{t-250:t}}{\sigma_{\sigma_{t-250:t}}}$
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (1)}
+
+\end {center}
+
+
+Normalizing volatility binds volatility spanning 20 years within a clearly defined interval which makes handling data far easier. Calculating the Z-score for all days within the data set yields 4,994 observations. The distribution of volatility Z-score in comparison to its absolute value is depicted in *Figure 2*  
+
+
+```{r echo = FALSE, fig.cap = "Volatility Distribution", figures-side, fig.show="hold", out.width="50%"}
+z_score <- vol_dist$`Z-Score`
+abs_vol <- vol_dist$`1-Mo Volatility`
+
+hist(z_score, breaks = 100, main = "Distribution of Volatility Z-scores", xlab = "Volatility Z-score")
+hist(abs_vol, breaks = 100, main = "Distribution of Absolute Volatility", xlab = "Absolute Volatility")
+```
+\newpage
+\doublespacing
+
+
+```{r echo = FALSE, fig.align="center", fig.cap = "Market Equity and Volatility Z-scores",  fig.show="hold", out.width="65%"}
+sorted_combo_2<-merge(sorted_combo,z_scores,by=c("Date","Date"))
+ggplot(sorted_combo_2, aes(x=Date, y=Zscore, color = Group)) + geom_point(size = 1)+ scale_color_manual(values=c("#00008b", "#bf290b"))+ylab("Volatility Z-score")+ theme_bw()+ theme(legend.position = "none")
+```
+As can be seen in *Figure 2*, Z-scores of volatility are centered around a mean of -0.01 with significant tails which, as shown in the time-series plot (Figure 4.), correlate with periods I defined as market shocks (painted red). This correlation is expected, given that the definition of market shocks is directly related to increased volatility. As such, observing market shock effects on Z-scores yields no additional systemic indicator of market shocks when compared to absolute volatility. The additional computational power is, therefore, wasted if I were to use solely volatility z-scores as an indicator.
+
+
+However, it is important to note that observing volatility z-scores gives further nuance that is not captured by my previous definition of market shocks. Namely, one can observe spikes in z-scores that are not painted red in *Figure 3*, indicating that defining market shocks through volatility and its z-scores is a better option when compared to rigid performance thresholds - a promising aspect. Yet, the issue of additional computational power for calculating z-scores with no additional indicative power in comparison to absolute still stands. However, the same issue does not stand when observing daily changes in volatility z-scores and a new potential relationship between market shocks and volatility appears. Daily change in volatility z-score is simply calculated as the difference between the normalized trailing 20-day volatility at day T and at day T-1 and is allowed to be both positive and negative.
+
+
+![Daily Changes in Volatility Z-scores](ss_1.png){width=75%}
+
+
+
+
+*Figure 4.* displays daily changes in volatility z-scores during two separate market shocks. One can immediately notice that, at least on first glance, there exists autocorrelation with a one-day shift within the observations. Although a chart such as *Figure 4.* is useful as a pointer that autocorrelation could exist, I need to test the distributions of Z-score changes for the control and market shock groups to conclude whether this is indeed the case. I calculate autocorrelation of daily volatility z-score changes as a Pearson correlation between values of the daily change with a lag of one day for a trailing period of one month, or twenty trading days, throughout the data set; a method that follows my calculation of normalized volatility itself. Written mathematically, the equation is as follows:
+
+
+\begin {center}
+
+$\Huge \rho_{\Delta\sigma \Delta\sigma} = \rho(\Delta\sigma_t,\Delta\sigma_{t-1}...\Delta\sigma_{t-19},\Delta\sigma_{t-20})$
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (2)}
+
+\end {center}
+
+
+
+
+From this point onward, for simplicity, I refer to the autocorrelation of the volatility z-score daily change as **autocorrelation**. The distribution of autocorrelation throughout the data set is displayed in *Figure 5.*
+
+```{r echo = FALSE, fig.cap = "Autocorrelation Distribution", fig.show="hold", out.width="75%",fig.align="center"}
+acorr <- rho_dist$Autocorrelation
+
+hist(acorr, breaks = 100, main = "Distribution of Autocorrelation", xlab = "Autocorrelation")
+```
+
+
+Unlike either absolute volatility or normalized volatility, the distribution of autocorrelation is highly symmetrical, with no significant tails or skewness. In fact, the distribution is close to normally distributed, with an Anderson-Darling statistic of 2.8. Such a distribution shows promise for the prospect of using autocorrelation as an indicator of market shocks. To test how the distribution of autocorrelation evolves during market shocks, I divide autocorrelation into two sub-groups: the control group (periods when market shocks are absent) and market shocks, following the same definition of market shocks as before. Below are plotted the distributions of autocorrelation for the two sub-groups alongside normality tests for both distributions.
+
+
+```{r echo = FALSE, fig.cap = "Autocorrelation Distribution", fig.show="hold", out.width="50%"}
+rho_normal <- rho_dist_normal$`1-Mo Autocorrelation`
+rho_shock <- rho_dist_shock$`1-Mo Autocorrelation`
+
+hist(rho_normal, breaks = 100, main = "Distribution of Autocorrelation: Normal Market", xlab = "Autocorrrelation")
+hist(rho_shock, breaks = 10, main = "Distribution of Autocorrelation: Market Shock", xlab = "Autocorrelation")
+```
+
+#### Normality Tests
+
+```{r echo = FALSE}
+kable(norm_test, caption = 'Normality Test Results', align = 'lcc')
+
+```
+
+
+As demonstrated by the normality tests, autocorrelation becomes normally distributed during market shocks. This change in normality already indicates systemic changes in behavior of autocorrelation during market shocks, another pointer that I can use autocorrelation as an indicator of market shocks.
+\newpage
+\doublespacing
+
+
+Furthermore, I conducted two tests for the differences in means between the two subgroups. 
+
+
+#### Two Sample T-test
+
+Even though normal market autocorrelation is not strictly normal, it does fit the requirements for a two-sample t-test, given its large sample size and generally bell shaped distribution. The test is set up as follows: 
+
+\begin {center}
+\begin{math}
+\begin{aligned}
+H_0 : \mu_{normal} = \mu_{shock} \\
+H_a : \mu_{normal} \ne \mu_{shock}
+\end {aligned}
+\end{math}
+\end {center}
+
+
+#### Mann-Whitney Test
+
+Without requiring an assumption of normality during normal market conditions, a Mann-Whitney test is conducted: 
+
+\begin {center}
+\begin{math}
+\begin{aligned}
+H_0 : \mu_{normal} = \mu_{shock} \\
+H_a : \mu_{normal} \ne \mu_{shock}
+\end {aligned}
+\end{math}
+\end {center}
+
+#### Results
+
+
+```{r echo = FALSE}
+kable(mean_test, caption = 'Mean Difference Tests Results', align = 'lcc')
+
+```
+
+
+Whether under the assumption that autocorrelation during normal market conditions is normally distributed or not, the mean difference between the two sub-groups is statistically significantly. This confirms the original hypothesis that autocorrelation does not only behave differently during market shocks but that its mean  decreases substantially from near zero to -1.80%. Annualized, the true scale of the differences in means is readily apparent, as it equates to 28%. As such, I can use autocorrelation as an indicator of market shocks and, in turn, the performance of Fama-french Factors. The final step is, therefore, the explore the performance of Fama-French factors to determine whether their returns behave differently during market shocks. Unsurprisingly, the underlying hypothesis is that their performance will decrease given my definition of market shocks 
+
+
+### Market Shock Effect on Fama French Factors
+
+
+
+Similar to my approach in analyzing autocorrelation, I divide Fama-French factor returns into two sub-groups. Descriptive statistics for the two distributions can be found in the following tables.
+
+
+```{r echo = FALSE}
+kable(factors_normal, caption = 'Fama-French Factors Return: Normal Market', align = 'lcc')
+kable(factors_shock, caption = 'Fama-French Factors Return: Market Shock', align = 'lcc')
+
+```
+\newpage
+\doublespacing
+
+Once divided, I ran Mann-Whitney tests for all pairs within the two sub-groups. The results are displayed below.
+
+\begin {center}
+\begin{math}
+\begin{aligned}
+H_0 : \mu_{normal} - \mu_{shock} = 0 \\
+H_a : \mu_{normal} - \mu_{shock} \ne 0
+\end {aligned}
+\end{math}
+\end {center}
+
+```{r echo = FALSE}
+kable(factor_test_res, caption = 'Fama-French Factors Mann-Whitney Test', align = 'lcc')
+```
+
+All mean differences are statistically significant. Furthermore, as hypothesized, the reduction in the means of all factors is substantial, with annualized differences for the Mkt-RF,SMB, and HML factors being 396%, 49%, and 25% respectively. Finally, the distribution of returns itself changes, with skewness reverting to levels usually found in normal distributions. Given the drastic change in mean returns and the distribution of returns itself, it is clear that Fama-French factors, in the same manner as autocorrelation, are affected drastically by market shocks. Having established effects of increased volatility on both variables of interest, I move to explore any relationships between the variables themselves. 
+
+\newpage
+\doublespacing
+
+
+## Exploration of Volatility-Factor Relationships
+
+
+### Negative Autocorrelation
+
+
+Given my findings that autocorrelation tends to decrease, rather increase in the negative direction, I begin by examining the existence of any relationship between Fama-French factors and autocorrelation for the interval [-0.4,0>. The cut-off point of -0.4 is chosen as data beyond that cut-off becomes too scarce to conduct any meaningful research. To gain a quick overview, I graph the average returns of all three factors for periods where autocorrelation is less than an increasing threshold, represented on the x-axis. 
+
+
+![Average Factor Returns for Given Autocorrelation Intervals](ss_2.png){width=75%}
+
+
+Red and orange rectangles indicate areas where the seemingly random walk of average returns exhibit a clear inflection point for all three factors. It is important to note that, given the trailing nature of averages depicted in the chart, the exact positioning of intervals is not going to be equal to those defined by the rectangles. However, they offer areas of interest within which I can explore any linear relationships. I use a Python script (*Appendix II*) to iterate through all possible intervals within the areas of interest and run linear regressions with factor returns as dependent and autocorrelation as the independent variable. Additionally, the script also tests for multiple lags within data, with possibilities ranging from 0 to 5 days. All relationships which exhibit a significant P-value at a 95% confidence level are logged, alongside the total range captured by the interval and the R-squared of the regression.  
+
+
+For each factor, the number of regressions ran range from a few hundred to a few thousand. Therefore, I had to develop a systematic approach to choosing which relationship should be favored. Given that the end goal of these regressions is to predict factor performance, the range captured by each relationship is crucial. It would be impractical, and unlikely to ever be put in practice, to define relationships for ranges smaller than 1%. R-squared, as a function. On the other hand, the predictive function of these regression models also warrants favor to higher R-squared relationships. R-squared, as a function of range, decreases exponentially as range is increased. However, certain intervals yield higher R-squared values than the range warrants. An example can be found below, in graph format, for regressions ran on the Mkt-RF factor as a function of autocorrelation for the interval [0.2,0.3].
+
+
+
+```{r echo = FALSE, fig.align="center", fig.cap = "Mkt-RF Returns as a Function of Autocorrelation", fig.show="hold", out.width="75%"}
+rng_rsq$Group <- as.factor(rng_rsq$Group)
+ggplot(rng_rsq, aes(x=Range, y=Rsq, color = Group)) + geom_point(size = 1)+ scale_color_manual(values=c("#00008b", "#bf290b"))+ylab("R-squared (%)")+xlab('Range (%)')+theme_bw()+ theme(legend.position = "none")
+```
+
+
+Points colored in red deviate from the main sequence, offering higher R-squared values than is warranted by their range. The point with the largest vertical distance from the main sequence is chosen as the preferred range in which the relationship will be described using linear regression. This process is repeated for each factor and each range for which the Python script has ran regressions. For the sake of reducing clutter, graphs and respective analyses beyond the example above will not be shown. Only the optimal range and its respective linear regression function will be displayed. Below are shown all optimal regression results in a tabular format. Regression titles indicate the range for which the relationship was tested, as well as the lag applied to factor returns before regressing.
+
+
+#### Mkt-RF
+
+$\vspace{0.05cm}$
+
+```{r, echo = FALSE, message = FALSE, results='asis', options(width = "75%")}
+lm.1 <- lm(MKT ~ Autocorrelation, mkt_0_2262_0_199799999999999)
+lm.2 <- lm(MKT ~ Autocorrelation, mkt_0_31325_0_3045)
+lm.3 <- lm(MKT ~ Autocorrelation, mkt_0_4285_0_4115)
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[-0.2262,-0.1998] 4-day Lag", "[-0.3133,-0.3045] 3-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("Mkt-RF"), single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+stargazer(lm.3, header=FALSE,  column.labels = c( "[-0.4285,-0.4115] 4-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("Mkt-RF"), single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+
+
+```
+
+\newpage
+\doublespacing
+
+#### SMB
+$\vspace{0.05cm}$
+```{r, echo = FALSE, message = FALSE, results='asis'}
+lm.1 <- lm(SMB ~ Autocorrelation, smb_0_2166_0_20939_3)
+lm.2 <- lm(SMB ~ Autocorrelation, smb_0_315_0_30375_4)
+lm.3 <- lm(SMB ~ Autocorrelation, smb_0_4315_0_4205_2)
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[-0.2166,-0.2094] 3-day Lag", "[-0.3150,-0.30375] 4-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("SMB"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+stargazer(lm.3, header=FALSE,  column.labels = c("[-0.4315,-0.4205] 2-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("SMB"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+
+```
+\newpage
+\doublespacing
+
+#### HML
+
+$\vspace{0.05cm}$
+
+```{r, echo = FALSE, message = FALSE, results='asis'}
+lm.1 <- lm(HML ~ Autocorrelation, hml_0_2136_0_2058_3)
+lm.2 <- lm(HML ~ Autocorrelation, hml_0_3288_0_30275_4)
+
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[-0.2136,-0.2058] 3-day Lag", "[-0.3288,-0.3028] 4-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("HML"))
+```
+
+
+#### Conclusion
+
+As hypothesized when looking at areas of interests in *Figure 7.*, there are intervals of autocorrelation that yield linear relationships between autocorrelation and the performance of market factors. Unfortunately for the purpose of forecasting out of sample returns, the range of those intervals is low across the board when autocorrelation is negative. However, R-squared values, especially for the range [-0.43, -0.41], are quite high for a simple linear relationship. As such, even with the restricted range, it is possible to forecast factor returns based on autocorrelation levels; no doubt, a useful tool for investors is starting to take shape.
+\newpage
+\doublespacing
+
+
+### Positive Autocorrelation
+
+Not to neglect a whole quadrant, I will also explore the relationship between autocorrelation and factor returns in the interval <0,1]. As with negative autocorrelation, I graph the average returns of all three factors for periods where autocorrelation is greater than an increasing threshold, represented on the x-axis.
+
+
+![Average Factor Returns for Given Autocorrelation Intervals](ss_3.png){width=100%}
+
+
+As before, the red rectangle indicates the area where factor returns exhibit behavior that is profoundly different from the rest of the sample. Although changes past three sigma seem drastic, these changes are mainly attributable to a rapid decay in observations and the quick exclusionary principle upon which the graph operates. In fact, the distribution of returns past three sigma, or an autocorrelation cut-off of 0.4, is not statistically different from normal market returns, as is shown in the two sample t-tests below. 
+
+
+\begin {center}
+\begin{math}
+\begin{aligned}
+H_0 : \mu_{normal} = \mu_{shock} \\
+H_a : \mu_{normal} \ne \mu_{shock}
+\end {aligned}
+\end{math}
+\end {center}
+
+```{r echo = FALSE}
+kable(past_04_t, caption = 'Fama-French Factors Return Past 0.4 Autocorrelation', align = 'lcccc')
+```
+
+
+Considering returns past three sigma do not different significantly from normal market conditions, I have focused my analysis on samples in the range [0,0.4]. As before, I redraw the graph excluding [0.4,1]
+
+
+![Average Factor Returns for Given Autocorrelation Intervals](ss_4.png){width=100%}
+
+
+As before, red and orange rectangles indicate areas where the seemingly random walk of average returns exhibit a clear inflection point for all three factors. I repeated the same analysis I conducted for negative autocorrelation, resulting in the following optimal linear relationships between autocorrelation and Fama-French factors.
+\newpage
+\doublespacing
+
+
+#### Mkt-RF
+
+$\vspace{0.05cm}$
+
+```{r, echo = FALSE, message = FALSE, results='asis'}
+lm.1 <- lm(MKT ~ Autocorrelation, mkt_0_1955_0_2235_4)
+lm.2 <- lm(MKT ~ Autocorrelation, mkt_0_2608_0_2893_4)
+lm.3 <- lm(MKT ~ Autocorrelation, mkt_0_3546_0_3904_1)
+lm.4 <- lm(MKT ~ Autocorrelation, mkt_0_2894_0_3083_3)
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[0.1955,0.2235] 4-day Lag", "[0.2608,0.2893] 4-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("Mkt-RF"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+stargazer(lm.4, lm.3, header=FALSE,  column.labels = c("[0.2894,0.3083] 3-Day Lag","[0.3546,0.3904] 1-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("Mkt-RF"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+
+```
+\newpage
+\doublespacing
+
+
+#### SMB
+
+$\vspace{0.05cm}$
+
+```{r, echo = FALSE, message = FALSE, results='asis'}
+lm.1 <- lm(SMB ~ Autocorrelation, smb_0_2055_0_2265_4)
+lm.2 <- lm(SMB ~ Autocorrelation, smb_0_2668_0_2915_3)
+lm.3 <- lm(SMB ~ Autocorrelation, smb_0_2941_0_3120_2)
+lm.4 <- lm(SMB ~ Autocorrelation, smb_0_35912_0_3950_2)
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[0.2055,0.2264] 4-day Lag", "[0.2668,0.2915] 3-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("SMB"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+stargazer(lm.3, lm.4, header=FALSE,  column.labels = c("[0.2941,0.3120] 2-Day Lag","[0.3591,0.3950] 2-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("SMB"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+```
+\newpage
+\doublespacing
+
+#### HML
+
+$\vspace{0.05cm}$
+
+```{r, echo = FALSE, message = FALSE, results='asis'}
+lm.1 <- lm(HML ~ Autocorrelation, hml_0_1865_0_2255_4)
+lm.2 <- lm(HML ~ Autocorrelation, hml_0_2668_0_2893_3)
+lm.3 <- lm(HML ~ Autocorrelation, hml_0_2957_0_3130_2)
+lm.4 <- lm(HML ~ Autocorrelation, hml_0_3518_0_3753_3)
+
+
+stargazer(lm.1, lm.2, header=FALSE,  column.labels = c("[0.1865,0.2255] 4-day Lag", "[0.2668,0.2893] 3-Day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("HML"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+stargazer(lm.3, lm.4, header=FALSE,  column.labels = c("[0.2957,0.3130] 2-day Lag","[0.3518,0.3753] 3-day Lag"), dep.var.labels = "Autocorrelation", covariate.labels = c("HML"),single.row = TRUE, no.space = TRUE, column.sep.width = "1pt", font.size = "small")
+```
+
+
+#### Conclusion
+
+Unlike intervals established for negative autocorrelation, the intervals for positive autocorrelation have a greater span. Furthermore, the intervals almost overlap, functionally extending the forecasting range. In fact, the greatest limitation in my analysis of relationships was computational, as I had to balance nuance and computational feasibility. With increased computational ability, I would be able to produce a greater number of more nuanced intervals. Nevertheless, these intervals provide both range and certainty, both integral requirements for projections outside of the sample set. Although positive correlation was not hypothesized under my definition of market shocks, any ability to forecast returns is valuable and is therefore included in future portfolio construction.
+
+
+## Volatility Forecasting
+
+### Determining the Appropriate Model
+
+
+Having established models with which one can forecast Fama-French factor returns the final step predating portfolio construction is volatility forecasting. If successful in demonstrating that volatility can be foretasted using a model, I can couple volatility forecasts with factor returns linear regression models to create portfolios preemptively rather than in a reactionary manner. 
+
+
+Before determining which model best describes volatility of the S&P500, I determine whether there exists heteroscedasticity within the distribution of volatility throughout the data set.
+
+```{r echo = FALSE, fig.align="center", fig.cap = "Trailing Daily Volatility", fig.show="hold", out.width="75%"}
+ggplot(vol_all, aes(x=Date, y=vol_all$`1-Mo Volatility`)) + geom_line(size = 0.75, color = "#00008b",shape=16)+ylab("Volatility")+ theme_bw()+ theme(legend.position = "none")
+```
+
+It is immediately clear that that there exists heteroscedasticity in the distribution, given the clumping of extraordinary periods of volatility. That is, there are clear periods of consistently low volatility and periods of consistently high volatility. However, it is still not clear which model would best describe the apparent autocorrelation present. I start by examining the ACF and PACF graphs for the S&P500 return data, as depicted in *Figure 12.*.
+
+
+```{r, echo = FALSE, fig.align="center", fig.cap = "SPY Returns ACF and PACF", fig.show="hold", out.width="100%"}
+
+chart.ACFplus(returns_all$`Daily Return`, maxlag = NULL, elementcolor = "gray", main = NULL)
+
+```
+
+Given that there seems to be no discernible pattern in the ACF chart, and that the first order correlation is close to zero, I conclude that there does not appear to be correlation between the observations of returns and the returns seem to behave as white noise. Furthermore, given the quick normalization of the PACF chart, I could only expect a first-order auto-regressive model if I did decide to follow that route. However, as noted before, the presence of volatility heteroscedasticity is apparent, which I will examine further by observing the ACF and PACF chart of the squared returns.
+
+
+```{r, echo = FALSE, fig.align="center", fig.cap = "Squared SPY Returns ACF and PACF", fig.show="hold", out.width="85%"}
+
+returns_all$`Daily Return` <- returns_all$`Daily Return`^2
+chart.ACFplus(returns_all$`Daily Return`, maxlag = NULL, elementcolor = "gray", main = NULL)
+
+```
+
+There is clear evidence of serial correlation in the squared residuals, with a clear geometric decline in the autocorrelation, indicating a serial dependence in the volatility of the data. Furthermore, observing the PACF chart, autocorrelation seems to drop sharply following the second lag. Given the presence of heteroscedasticity and the apparent reduction in autocorrelation past the second lag, a GARCH(2,2) model seems most fitting to describe S&P500 returns volatility. As such, volatility of the S&P500 can be described as:
+
+\begin {center}
+
+$\sigma^2=\omega + \alpha_1\epsilon^2_{t-1}+ \alpha_2\epsilon^2_{t-2}+\beta_1\sigma^2_{t-1}+\beta_2\sigma^2_{t-2}$
+
+\end{center}
+
+\newpage
+\doublespacing
+
+### Fitting a GARCH Model
+
+
+I fit a GARCH(2,2) model over the whole sample of S&P500 daily returns. The output is displayed below:
+
+
+```{r echo = FALSE}
+kable(garch_2_2_output_1, caption = 'GARCH(2,2) Model Fit', align = 'lcc')
+
+```
+
+A GARCH(2,2) model fit produces 4 statistically significant variables, with only $\beta_1$ being statistically insignificant. Reducing to the simpler GARCH(1,1) model might be in order, yet the model would lose out on $\beta_2$, which is statistically significant and adds value to my model. Following this model fit, volatility at any time t can be described as:
+
+\begin {center}
+
+$\sigma^2=0.0415+ 0.0864 \epsilon^2_{t-1}+ 0.1379\epsilon^2_{t-2}+0.1989\sigma^2_{t-1}+0.5484\sigma^2_{t-2}$
+
+\end{center}
+
+Given the statistical insignificance of $\beta_1$, I also fit a GARCH(1,1) model over the whole sample of S&P500 daily returns. The output is displayed below:
+
+\newpage
+\doublespacing
+
+
+```{r echo = FALSE}
+kable(garch_1_1_output_1, caption = 'GARCH(1,1) Model Fit', align = 'lcc')
+```
+
+Unlike the GARCH(2,2) fit, all coefficients are statistically significant at a confidence level of 95%. However, the Akaike information criterion has increased by more than 2, indicating that a significant amount of forecasting power has been lost when simplifying from a GARCH(2,2) model to a GARCH(1,1) model. No matter the model choice, GARCH forecasts daily volatilities. My models are built on trailing 20 day daily volatility and, as such, I have to adjust values from the GARCH output to those that match my model. GARCH forecasts are based on the following general formula^4^:
+
+
+\begin {center}
+
+$\hat{\sigma}^2_{t+h}= \hat{\omega}+(\hat{\alpha}+\hat{\beta})\hat{\sigma}^2_{t+h-1}$
+
+\end{center}
+
+
+By applying the above formula iteratively, I can forecast the conditional variance for any horizon h. Then, the forecast of the compound volatility at time T+h is:
+
+
+\begin {center}
+
+$\hat{\sigma}^2_{t+1:t+h}= \sqrt{\sum_{i = 1}^{h} \hat{\sigma}^2_{t+i}}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (3)}
+
+\end {center}
+
+Given that I'm interested in 20 day volatility, the formula can be transformed to the following:
+
+\begin {center}
+
+$\hat{\sigma}_{t+1:t+h}= \sqrt{\sum_{i = 1}^{20} \hat{\sigma}^2_{t+i}}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (4)}
+
+\end {center}
+
+
+Finally, to convert the cumulative volatility back to daily volatility I divide by the square root of twenty, as follows:
+
+\begin {center}
+
+$\hat{\sigma}_{t+1:t+h}= \frac{\sqrt{\sum_{i = 1}^{20} \hat{\sigma}^2_{t+i}}}{\sqrt{20}}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (5)}
+
+\end {center}
+
+
+Going back to the choice of model, to truly test which model is better at forecasting volatility, I retrofit, or back-test, both models on the the total sample. Specifically, I fit both a GARCH(2,2) and a GARCH(1,1) model on S&P500 returns ranging from January 1^st^, 2000 to May 2^nd^, 2014. I then forecast trailing 20 day daily volatility following *Equation 5*. I expand the training set to then also include May 3^rd^, 2014 and refit the model. Once again, I forecast volatility using *Equation 5*. This process continues until the training set has reached the end of the S&P500 returns sample. The performance of both models is depicted below:
+
+
+```{r echo = FALSE, fig.align="center", fig.cap = "GARCH(2,2) Model Forecasts", fig.show="hold", out.width="75%"}
+
+ggplot(garch_2_2_output, aes(x=garch_2_2_output$`Last Date`, y=garch_2_2_output$`Forecasted Volatility`)) + geom_line(size = 0.75, color = "#00008b",shape=16)+xlab("Date") + ylab("Volatility")+ theme_bw()+ theme(legend.position = "none") + geom_line(aes(x=garch_2_2_output$`Last Date`, y=garch_2_2_output$`Actual Volatility`), color = "#8b0000")
+```
+Forecasted volatility is shown in blue, while actual volatility is shown in red. To test the fit of the model I use total and mean square error. I define the total square error using the following equation:
+
+
+\begin {center}
+
+$TSE = \sqrt{\sum_{i = 1}^{n}(\sigma_{forecast}-\sigma_{actual})}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (6)}
+
+\end {center}
+
+, and the mean square error as:
+
+\begin {center}
+
+$TSE = \frac{\sqrt{\sum_{i = 1}^{n}(\sigma_{forecast}-\sigma_{actual})}}{n}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (7)}
+
+\end {center}
+
+The total square error for the GARCH(2,2) model fit is 25.51% and the mean square error is 0.01%. Just by observing the performance of the GARCH(2,2) model, one can quickly see that the model seems to over and under estimate volatility, which is a direct consequence of the statistically insignificant $\beta_1$.
+
+
+
+```{r echo = FALSE, message = FALSE, fig.align="center", fig.cap = "GARCH(1,1) Model Forecasts", fig.show="hold", out.width="75%"}
+ggplot(garch_1_1_output, aes(x=garch_1_1_output$`Last Date`, y=garch_1_1_output$`Forecasted Volatility`)) + geom_line(size = 0.75, color = "#00008b",shape=16)+xlab("Date") + ylab("Volatility")+ theme_bw()+ theme(legend.position = "none") + geom_line(aes(x=garch_1_1_output$`Last Date`, y=garch_1_1_output$`Actual Volatility`), color = "#8b0000")
+
+```
+
+The total square error for the GARCH(1,1) mode fit stands at 25.60%, with the mean square error at 0.01419%. Consequently, both models do a fair job at forecasting volatility, with GARCH(2,2) gaining only a slight advantage, as was expected given the difference in Akaike Information Criteria. 
+
+### Conclusion
+
+Having examined the performance of GARCH models in forecasting volatility, I have shown one can use a GARCH(2,2) model to forecast volatility. Forecasted volatility can then be transformed into autocorrelation forecasts using the same approach I employed to calculate autocorrelation in the first place. As a final note, it is possible to increase the accuracy of GARCH model forecasts by reducing the trailing period for which volatility is calculated at the cost, as the forecast can react to new information with a lesser lag. However, reducing lag comes at the cost of returns data that is included in the calculation of volatility in the first place.
+
+
+## Portfolio Construction
+
+Having shown that one can forecast volatility autocorrelation and the performance of Fama-French factors based on their linear relationship with autocorrelation, I have supplied all the necessary tools to start building modular portfolios.
+
+Upon fitting a GARCH(2,2) model , volatility can be forecasted as: 
+
+
+\begin {center}
+
+$\hat{\sigma}_{t+1:t+h}= \frac{\sqrt{\sum_{i = 1}^{20} \hat{\sigma}^2_{t+i}}}{\sqrt{20}}$
+
+\end{center}
+
+\begin {center}
+
+\emph{Equation (8)}
+
+\end {center}
+
+Where $$\hat{\sigma}^2_{t+i}=  \hat{\omega}+(\hat{\alpha}+\hat{\beta})\hat{\sigma}^2_{t+i-1}$$
+
+
+Projected volatility can be normalized as follows (the assumption that in the short period of 20 trading days the yearly mean and standard deviation will not change significantly):
+
+
+\begin {center}
+
+
+$\Huge \hat{\sigma}_{t+20} = \frac{\frac{\sqrt{\sum_{i = 1}^{20} \hat{\sigma}^2_{t+i}}}{\sqrt{20}}-\overline{\sigma}_{t-250:t}}{\sigma_{\sigma_{t-250:t}}}$
+
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (9)}
+
+\end {center}
+
+Note that normalized volatility is forecast with a lag of 20 days. The process of forecasting normalized volatility is, therefore, iterative, in a manner similar to my model fit. As days pass and actual volatility data can be used to re-fit the model, new forecasts with a lag of 20 days can be produced. Once 20 days have passed since the original forecast, the iterative process has produced 20 forecasts of normalized volatility. This forecasted sample is enough to generate one point estimator of autocorrelation, given that all linear relationships of autocorrelation with factor performance are based on trailing 20 day autocorrelation. The point estimator of autocorrelation is, therefore, calculated as:
+
+
+\begin {center}
+
+
+$\Huge \hat{\rho}_{\Delta\sigma \Delta\sigma: t+20} = \rho(\Delta\hat{\sigma}_{t+40},\Delta\hat{\sigma}_{t+39}...\Delta\hat{\sigma}_{t+21},\Delta\hat{\sigma}_{t+20})$
+
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (10)}
+
+\end {center}
+
+
+If there is a need for a lag (h) between when a point estimator of autocorrelation can feasibly be constructed and the end of the iterative process, which is most likely the case in practical terms, then volatility can be forecast as:
+
+\begin {center}
+
+
+$\Huge \hat{\sigma}_{t+20+h} = \frac{\frac{\sqrt{\sum_{i = 1}^{20} \hat{\sigma}^2_{t+i+h}}}{\sqrt{20}}-\overline{\sigma}_{t-250:t}}{\sigma_{\sigma_{t-250:t}}}$
+
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (11)}
+
+\end {center}
+
+, and autocorrelation as:
+
+\begin {center}
+
+
+$\Huge \hat{\rho}_{\Delta\sigma \Delta\sigma: t+20+h} = \rho(\Delta\hat{\sigma}_{t+40+h},\Delta\hat{\sigma}_{t+39+h}...\Delta\hat{\sigma}_{t+21+h},\Delta\hat{\sigma}_{t+20+h})$
+
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (11)}
+
+\end {center}
+
+
+Having established linear relationships between autocorrelation and Fama-French factors, expected return of any factor can be modeled as:
+
+\begin {center}
+
+
+$E[r_t] = \beta_0 + \beta_1\hat{\rho} + \epsilon$
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (11)}
+
+\end {center}
+
+, where $\rho$ is the point estimator of autocorrelation obtained through the iterative functions defined above and where $\beta_0$ and $\beta_1$ represent regression coefficients for a given interval within which the point estimator of autocorrelation lays, as defined in **Exploration of Volatility-Factor Relationships**. Additionally, the standard deviation of the forecasted return can be modeled as:
+
+
+\begin {center}
+
+
+$\hat{\sigma_r} = \sqrt{MSE(1+\frac{1}{n}+\frac{(r_h-\overline{r})^2}{\sum{(r_h-\overline{r})^2}})}$
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (11)}
+
+\end {center}
+
+, which represents the standard error of prediction for the linear regression model used to forecast the expected return. Having an estimate of the standard deviation of the expected return is useful for periods wherereturns for multiple factors can be forecasted. In that case, an efficient portfolio can be constructed optimizing for the maximum return, under the following parameters:
+
+\begin {center}
+\begin{math}
+\begin{aligned}
+ & E[r_p]  = \omega_{mkt-rf}E[r_{mkt-rf}] + \omega_{smb}E[r_{smb}] + \omega_{hml}E[r_{hml}] \\
+ & \hat{\sigma}_{p}^2 = \omega_{mkt-rf}^2\hat{\sigma}_{mkt-rf}^2+ \omega_{smb}^2\hat{\sigma}_{smb}^2 +\\
+ & \omega_{hml}^2\hat{\sigma}_{hml}^2 + 2\omega_{mkt-rf}\omega_{smb}\rho(r_{mkt-rf},r_{smb})+\\
+ &  2\omega_{mkt-rf}\omega_{hml}\rho(r_{mkt-rf},r_{hml})+ 2\omega_{hml}\omega_{smb}\rho(r_{hml},r_{smb})
+\end {aligned}
+\end{math}
+\end {center}
+
+\begin {center}
+
+\emph{Equation (12)}
+
+\end {center}
+
+
+### Mimicking Portfolios
+
+
+Optimizing for maximum return under the parameters defined above yields an optimal portfolio of Fama-French Factors. However, there is no practical, direct way to create portfolios consisting of Fama-French factors in reality. However, the hypothetical portfolio can be recreated using liquid equities through portfolio mimicking. For each of the selected liquid assets selected to be included in the mimicking portfolio, run an OLS estimation to obtain their exposure to the selected factors. Once found, the mimicking portfolio is constructed as a weighted average of the assets, where the weights are given as a solution to the optimization problem^5^:
+
+
+\begin {center}
+
+
+$Min_{\omega}\sum_{i=1}^N\sum_{m=1}^N \omega_i \omega_m \hat{\sigma}_{i,m}$
+
+
+\end {center}
+
+\begin {center}
+
+\emph{Equation (13)}
+
+\end {center}
+
+The constraints for the optimization problem are as follows:
+
+\begin {center}
+
+ $\sum_{i=1}^n \omega_i =1$
+ 
+\end {center}
+
+\begin {center}
+ 
+ $\sum_{i=1}^n \omega_i \hat{\beta_{i,k}} = \beta_{i,k} \text{ for every k}$
+ 
+\end {center}
+
+\begin {center}
+
+\emph{Equation (14)}
+
+\end {center}
+
+
+
+A mimicking portfolio offers the same exposure to market factors as any single asset yet offers the additional benefit of diversification of idiosyncratic risk.
+
+# Conclusion
+
+
+This paper studies the effect of market shocks on volatility and Fama-French factors. More specifically, the paper examines whether increased autocorrelation of normalized volatility changes exhibits a tangible effect on the performance of Fama-French factors and whether it can be used as an effective indicator of market shocks. Results indicate that autocorrelation of normalized volatility changes tends to increase significantly as markets dip into shocks, with a historical increase in its annualized mean of 28% percent. Furthermore, results show that autocorrelation can be used as an independent predictor of the returns of Fama-French factors for multiple ranges of autocorrelation, both those that would indicate the presence of a market shock and those that sit well within normal market conditions. Most importantly for practical use, the paper provides proof that GARCH models can be used to accurately model the behavior of volatility over large time horizons and, in turn, generate point predictors of autocorrelation. Given the relationships between factor performance and autocorrelation established within this paper, point predictors of autocorrelation can be used to create efficient portfolios of Fama-French factors that maximize returns in response to volatility changes. Additionally, portfolios created as a result of methods applied within this paper are not limited to hypothetical financial concepts, as mimicking portfolios can be created with any selection of highly-liquid financial instruments. These mimicking portfolios emulate the performance of Fama-French factors with the added benefit of diversification of idiosyncratic risk. As such, the methods described within this paper offer a way for investors to preemptively hedge against drastic volatility changes in a manner best suited to their specific needs, given the flexibility of mimicking portfolios. 
+
+\newpage
+
+
+# Works Cited
+
+\setlength{\parindent}{-0.2in}
+\setlength{\leftskip}{0.2in}
+\setlength{\parskip}{8pt}
+\noindent
+
+^1^ Hedge Funds Are Shorting VIX  Read More at: Https://Economictimes.indiatimes.com/Markets/Stocks/News/Hedge-Funds-Are-Shorting-Vix/Articleshow/69089108.Cms?utm_source=Contentofinterest&amp;utm_medium=Text&amp;utm_campaign=Cppst. 29 Apr. 2019, economictimes.indiatimes.com/markets/stocks/news/hedge-funds-are-shorting-vix/articleshow/69089108.cms?from=mdr. 
+
+
+^2^ Sirtori-Cortina, Daniela. Quarterly Hedge Fund Liquidations Rise to Highest Since 2015. 30 June 2020, www.bloomberg.com/news/articles/2020-06-30/quarterly-hedge-fund-liquidations-surge-to-highest-since-2015.  
+
+
+^3^ Hedge Funds Are Shorting VIX  Read More at: Https://Economictimes.indiatimes.com/Markets/Stocks/News/Hedge-Funds-Are-Shorting-Vix/Articleshow/69089108.Cms?utm_source=Contentofinterest&amp;utm_medium=Text&amp;utm_campaign=Cppst. 29 Apr. 2019, economictimes.indiatimes.com/markets/stocks/news/hedge-funds-are-shorting-vix/articleshow/69089108.cms?from=mdr. 
+
+
+^4^ Engle, Robert F. “Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation.” Econometrica, vol. 50, no. 4, 1982, pp. 987–1007. JSTOR, www.jstor.org/stable/1912773. Accessed 11 May 2021.
+
+
+^5^ Roll, R., and A. Srivastava. 2020. “Mimicking Portfolios.” Journal of Portfolio Management 44 (5): 21–35. Accessed October 21. doi:10.3905/jpm.2018.44.5.021.
+
+
+
+
+
+
+
+
+
+
+
